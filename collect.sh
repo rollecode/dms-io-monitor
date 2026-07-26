@@ -62,16 +62,29 @@ proc_snap() {
   done
 }
 
-D1=$(disk_snap); P1=$(proc_snap)
+# System-wide totals come from /proc/vmstat, which counts block I/O in the
+# VM layer and therefore works on every machine, including ones whose udev
+# rules switch off per-device accounting (queue/iostats = 0).
+vm_snap() { awk '/^pgpgin /{i=$2} /^pgpgout /{o=$2} END{print i, o}' /proc/vmstat; }
+
+# Identical ordering in both batches, so every pair is separated by the same
+# interval. Scanning a few hundred /proc files takes real time, so the window
+# is measured rather than assumed.
+T1=$(date +%s%N)
+P1=$(proc_snap); V1=$(vm_snap); D1=$(disk_snap)
 sleep 0.5
-D2=$(disk_snap); P2=$(proc_snap)
+T2=$(date +%s%N)
+P2=$(proc_snap); V2=$(vm_snap); D2=$(disk_snap)
+ELAPSED=$(awk -v a="$T1" -v b="$T2" 'BEGIN{e=(b-a)/1000000000; print (e > 0.05 ? e : 0.5)}')
 
 {
+  printf 'VA %s\n' "$V1"
+  printf 'VB %s\n' "$V2"
   printf '%s\n' "$D1" | sed 's/^/DA /'
   printf '%s\n' "$D2" | sed 's/^/DB /'
   printf '%s\n' "$P1" | sed 's/^/PA /'
   printf '%s\n' "$P2" | sed 's/^/PB /'
-} | awk -v scale="$SCALE" -v fs="$FS" '
+} | awk -v scale="$SCALE" -v fs="$FS" -v el="$ELAPSED" '
 function human(b,   u, i) {
   if (b < 1024) return sprintf("%d B/s", b)
   split("K M G T", u, " ")
@@ -81,18 +94,20 @@ function human(b,   u, i) {
   return (b < 10 ? sprintf("%.1f %sB/s", b, u[i]) : sprintf("%d %sB/s", b, u[i]))
 }
 function pct(rate) { return rate * 100 / scale }
+$1=="VA"{ vr1=$2 * 1024; vw1=$3 * 1024 }
+$1=="VB"{ vr2=$2 * 1024; vw2=$3 * 1024 }
 $1=="DA"{ dr1[$2]=$3; dw1[$2]=$4; dt1[$2]=$5 }
 $1=="DB"{ dr2[$2]=$3; dw2[$2]=$4; dt2[$2]=$5 }
 $1=="PA"{ pr1[$2]=$3; pw1[$2]=$4 }
 $1=="PB"{ pr2[$2]=$3; pw2[$2]=$4 }
 END{
-  # 0.5 s window -> per-second rates.
+  # Measured window -> per-second rates.
   totR = 0; totW = 0; busiest = 0
   for (d in dr2) {
-    r = (dr2[d] - dr1[d]) * 2
-    w = (dw2[d] - dw1[d]) * 2
+    r = (dr2[d] - dr1[d]) / el
+    w = (dw2[d] - dw1[d]) / el
     if (r < 0) r = 0; if (w < 0) w = 0
-    totR += r; totW += w
+    if (r + w > 0) diskMoved = 1
     # Field 13 is milliseconds with I/O in flight: 500 ms of a 500 ms window
     # means the queue was never empty, which is the saturation signal.
     busy = (dt2[d] - dt1[d]) / 5
@@ -107,22 +122,21 @@ END{
   procR = 0; procW = 0
   for (p in pr2) {
     if (!(p in pr1)) continue
-    pr[p] = (pr2[p] - pr1[p]) * 2
-    pw[p] = (pw2[p] - pw1[p]) * 2
+    pr[p] = (pr2[p] - pr1[p]) / el
+    pw[p] = (pw2[p] - pw1[p]) / el
     if (pr[p] < 0) pr[p] = 0
     if (pw[p] < 0) pw[p] = 0
     procR += pr[p]; procW += pw[p]
   }
 
-  note = ""
-  if (totR + totW == 0 && procR + procW > 0) {
-    totR = procR; totW = procW
-    note = ", from processes"
-  }
+  totR = (vr2 - vr1) / el
+  totW = (vw2 - vw1) / el
+  if (totR < 0) totR = 0
+  if (totW < 0) totW = 0
 
-  printf "F\t%d\t-\tRead\t%d%% of %d MB/s%s\t\t%s\n",  pct(totR), pct(totR), fs, note, human(totR)
-  printf "F\t%d\t-\tWrite\t%d%% of %d MB/s%s\t\t%s\n", pct(totW), pct(totW), fs, note, human(totW)
-  if (busiestName != "" && note == "") printf "F\t%d\t-\tBusiest disk\t%s\t\t%d%%\n", busiest, busiestName, busiest
+  printf "F\t%d\t-\tRead\t%d%% of %d MB/s\t\t%s\n",  pct(totR), pct(totR), fs, human(totR)
+  printf "F\t%d\t-\tWrite\t%d%% of %d MB/s\t\t%s\n", pct(totW), pct(totW), fs, human(totW)
+  if (diskMoved) printf "F\t%d\t-\tBusiest disk\t%s\t\t%d%%\n", busiest, busiestName, busiest
 
   for (p in pr) {
     if (pr[p] + pw[p] > 0) printf "P|%d|%s|%s\n", pct(pr[p] + pw[p]), p, human(pr[p] + pw[p])

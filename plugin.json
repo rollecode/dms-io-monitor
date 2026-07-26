@@ -1,13 +1,18 @@
 {
-    "id": "ioMonitor",
-    "name": "I/O Monitor",
-    "description": "Live disk read and write throughput as an animated progress bar in the DankBar",
-    "version": "1.0.0",
-    "author": "Rolle Laukkarinen",
-    "icon": "swap_vert",
-    "type": "widget",
-    "capabilities": ["dankbar-widget"],
-    "component": "./IoWidget.qml",
-    "settings": "./IoSettings.qml",
-    "permissions": ["settings_read", "settings_write"]
+  "id": "ioMonitor",
+  "name": "I/O Monitor",
+  "description": "Live disk read and write throughput as an animated progress bar in the DankBar",
+  "version": "1.1.0",
+  "author": "Rolle Laukkarinen",
+  "icon": "swap_vert",
+  "type": "widget",
+  "capabilities": [
+    "dankbar-widget"
+  ],
+  "component": "./IoWidget.qml",
+  "settings": "./IoSettings.qml",
+  "permissions": [
+    "settings_read",
+    "settings_write"
+  ]
 }

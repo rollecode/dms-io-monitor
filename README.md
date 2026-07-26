@@ -14,19 +14,9 @@ Sibling of [RAM Monitor](https://github.com/rollecode/dms-ram-monitor), [VRAM Mo
 
 ## The popout
 
-Rates need two samples, so everything is measured across one half-second window. Per-process figures come from `/proc/<pid>/io`, which counts real block-device traffic rather than page-cache hits; processes owned by other users are unreadable without privileges and are skipped.
+System totals come from `/proc/vmstat`, so they work on every machine, including ones whose udev rules disable per-device I/O accounting. Per-disk rows appear when the kernel is keeping those counters. Rates need two samples, so everything is measured across one short window. Per-process figures come from `/proc/<pid>/io`, which counts real block-device traffic rather than page-cache hits; processes owned by other users are unreadable without privileges and are skipped.
 
 Each process shows a second, dimmer word where one can be resolved: the script for interpreters, the working directory for shells, the subprocess type for Electron apps.
-
-## If the numbers stay at zero
-
-Some systems ship a udev rule that disables kernel I/O accounting for SSDs as a performance tweak:
-
-```
-KERNEL=="nvme[0-9]*", ATTR{queue/iostats}="0"
-```
-
-With that in place `/proc/diskstats` never advances, and `iostat` and friends are blind too. Check with `cat /sys/block/nvme0n1/queue/iostats`, and enable it with `echo 1 | sudo tee /sys/block/nvme0n1/queue/iostats`. The widget falls back to summing per-process I/O when the disk counters are frozen and marks those rows "from processes", but per-disk rows and the busiest-disk row need the kernel counters.
 
 ## Installation
 

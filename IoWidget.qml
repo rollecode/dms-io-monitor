@@ -11,7 +11,8 @@ PluginComponent {
 
     property real readRate: 0
     property real writeRate: 0
-    property var prevDisks: ({})
+    property real prevIn: 0
+    property real prevOut: 0
     property bool showLabel: pluginData.showLabel !== false
     property string labelText: pluginData.labelText || "I/O"
     property int fullScaleMb: pluginData.fullScaleMb || 200
@@ -59,43 +60,39 @@ PluginComponent {
 
     Process {
         id: pillProcess
-        command: ["cat", "/proc/diskstats"]
+        // /proc/vmstat counts block I/O in the VM layer, so it reports real
+        // traffic even where per-device accounting is switched off.
+        command: ["cat", "/proc/vmstat"]
         running: false
 
         stdout: StdioCollector {
             onStreamFinished: {
-                let r = 0, w = 0
-                const now = {}
-                for (const line of text.split("\n")) {
-                    const f = line.trim().split(/\s+/)
-                    if (f.length < 10) continue
-                    // Whole disks only: partitions would double-count.
-                    if (!/^(nvme\d+n\d+|sd[a-z]+|vd[a-z]+|hd[a-z]+|mmcblk\d+)$/.test(f[2])) continue
-                    const rd = parseInt(f[5]) * 512
-                    const wr = parseInt(f[9]) * 512
-                    now[f[2]] = [rd, wr]
-                    const prev = root.prevDisks[f[2]]
-                    if (prev) {
-                        r += Math.max(0, rd - prev[0])
-                        w += Math.max(0, wr - prev[1])
-                    }
+                const gi = text.match(/^pgpgin (\d+)$/m)
+                const go = text.match(/^pgpgout (\d+)$/m)
+                if (!gi || !go) return
+                const rd = parseInt(gi[1]) * 1024
+                const wr = parseInt(go[1]) * 1024
+                if (root.prevIn > 0) {
+                    root.readRate = Math.max(0, rd - root.prevIn)
+                    root.writeRate = Math.max(0, wr - root.prevOut)
                 }
-                if (Object.keys(root.prevDisks).length > 0) {
-                    root.readRate = r
-                    root.writeRate = w
-                }
-                root.prevDisks = now
+                root.prevIn = rd
+                root.prevOut = wr
             }
         }
     }
 
+    // Warm the list in the background: the collectors take up to a second, and
+    // starting them on click leaves the popout empty until they finish.
     Timer {
-        interval: 2000
-        running: root.popoutOpen
+        interval: root.popoutOpen ? 2000 : 20000
+        running: true
         repeat: true
         triggeredOnStart: true
         onTriggered: rowsProcess.running = true
     }
+
+    onPopoutOpenChanged: if (popoutOpen) rowsProcess.running = true
 
     Process {
         id: rowsProcess
