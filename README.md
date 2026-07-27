@@ -1,8 +1,8 @@
 # I/O Monitor
 
-Live disk read and write throughput in your [DankBar](https://github.com/AvengeMedia/DankMaterialShell), updated every second.
+Live disk read and write throughput in your [DankBar](https://github.com/AvengeMedia/DankMaterialShell), updated every second. Sibling of [RAM Monitor](https://github.com/rollecode/dms-ram-monitor), [VRAM Monitor](https://github.com/rollecode/dms-vram-monitor), [GPU Monitor](https://github.com/rollecode/dms-gpu-monitor), [CPU Monitor](https://github.com/rollecode/dms-cpu-monitor) and [Disk Monitor](https://github.com/rollecode/dms-disk-monitor).
 
-Sibling of [RAM Monitor](https://github.com/rollecode/dms-ram-monitor), [VRAM Monitor](https://github.com/rollecode/dms-vram-monitor), [GPU Monitor](https://github.com/rollecode/dms-gpu-monitor), [CPU Monitor](https://github.com/rollecode/dms-cpu-monitor) and [Disk Monitor](https://github.com/rollecode/dms-disk-monitor).
+<img width="555" height="532" alt="image" src="https://github.com/user-attachments/assets/3b17e627-7249-4d94-8685-e5a25ecfae00" />
 
 ## What it does
 
