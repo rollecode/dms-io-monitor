@@ -1,10 +1,10 @@
 {
   "id": "ioMonitor",
   "name": "I/O Monitor",
-  "description": "Live disk read and write throughput as an animated progress bar in the DankBar",
-  "version": "1.1.0",
+  "description": "Live disk read and write throughput in the DankBar, with a choice of chart styles, in horizontal and vertical bars",
+  "version": "1.2.0",
   "author": "Rolle Laukkarinen",
-  "icon": "swap_vert",
+  "icon": "hard_disk",
   "type": "widget",
   "capabilities": [
     "dankbar-widget"
