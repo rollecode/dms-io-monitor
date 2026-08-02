@@ -13,31 +13,33 @@ PluginComponent {
     property real writeRate: 0
     property real prevIn: 0
     property real prevOut: 0
+    property bool showIcon: pluginData.showIcon !== false
+    property bool iconInChart: pluginData.iconInChart !== false
     property bool showLabel: pluginData.showLabel !== false
+    property bool showValue: pluginData.showValue !== false
     property string labelText: pluginData.labelText || "I/O"
+    property string chartStyle: pluginData.chartStyle || "hbar"
     property int fullScaleMb: pluginData.fullScaleMb || 200
     property int topCount: pluginData.topCount || 30
     property var rows: []
     property bool popoutOpen: false
 
-    readonly property real combinedPercent: 100 * (readRate + writeRate) / (fullScaleMb * 1048576)
+    // A blank custom name means "not filled in yet", not "no icon" — that is what
+    // the separate Show icon toggle is for.
+    readonly property string iconName: {
+        const choice = String(pluginData.iconChoice || "hard_disk")
+        if (choice !== "custom") return choice
+        const custom = String(pluginData.customIconName || "").trim()
+        return custom.length > 0 ? custom : "hard_disk"
+    }
+    readonly property real chartBarThickness: Math.max(0.05, Math.min(1, Number(pluginData.chartBarThickness || 35) / 100))
 
-    // Bar-aware sizing: the DankBar carries its own font scale and thickness,
-    // and a pill that ignores them stays put while everything else resizes.
-    readonly property real pillFont: Theme.barTextSize(barThickness, barConfig ? barConfig.fontScale : undefined, barConfig ? barConfig.maximizeWidgetText : undefined)
+    readonly property real combinedPercent: 100 * (readRate + writeRate) / (fullScaleMb * 1048576)
 
     function usageColor(percent) {
         if (percent > 90) return Theme.error
         if (percent > 75) return "#ffa500"
         return Theme.primary
-    }
-
-    // Reserve exactly the width of the widest value so the pill never resizes
-    // as digits change, without parking short values far from the bar.
-    TextMetrics {
-        id: pctMetrics
-        font.pixelSize: root.pillFont
-        text: "100%"
     }
 
     function fmtRate(bytes) {
@@ -51,11 +53,21 @@ PluginComponent {
     }
 
     Timer {
+        // A hidden bar has nothing to show, so stop sampling until it comes back.
+        // The counters are cleared on the way out so the first sample after a long
+        // pause seeds a new baseline instead of reporting the whole gap as a spike.
         interval: 1000
-        running: true
+        running: root._barRevealed
         repeat: true
         triggeredOnStart: true
         onTriggered: pillProcess.running = true
+        onRunningChanged: {
+            if (running) return
+            root.prevIn = 0
+            root.prevOut = 0
+            root.readRate = 0
+            root.writeRate = 0
+        }
     }
 
     Process {
@@ -86,7 +98,7 @@ PluginComponent {
     // starting them on click leaves the popout empty until they finish.
     Timer {
         interval: root.popoutOpen ? 2000 : 20000
-        running: true
+        running: root._barRevealed || root.popoutOpen
         repeat: true
         triggeredOnStart: true
         onTriggered: rowsProcess.running = true
@@ -136,57 +148,16 @@ PluginComponent {
     }
 
     horizontalBarPill: Component {
-        Row {
-            spacing: Theme.spacingS
+        IoPill {
+            pluginRoot: root
+            isVerticalOrientation: false
+        }
+    }
 
-            DankIcon {
-                name: "swap_vert"
-                size: root.iconSizeLarge
-                color: Theme.surfaceText
-                anchors.verticalCenter: parent.verticalCenter
-            }
-
-            StyledText {
-                visible: root.showLabel
-                text: root.labelText
-                font.pixelSize: root.pillFont
-                color: Theme.surfaceText
-                anchors.verticalCenter: parent.verticalCenter
-            }
-
-            Row {
-                spacing: 4
-                anchors.verticalCenter: parent.verticalCenter
-
-                Rectangle {
-                    width: Math.round(root.pillFont * 3.7)
-                    height: Math.max(4, Math.round(root.pillFont / 2))
-                    radius: height / 2
-                    color: Qt.rgba(Theme.surfaceText.r, Theme.surfaceText.g, Theme.surfaceText.b, 0.25)
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    Rectangle {
-                        width: parent.width * Math.min(root.combinedPercent, 100) / 100
-                        height: parent.height
-                        radius: parent.radius
-                        color: root.usageColor(root.combinedPercent)
-                        Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
-                        Behavior on color { ColorAnimation { duration: 400 } }
-                    }
-                }
-
-                StyledText {
-                    width: pctMetrics.width
-                    horizontalAlignment: Text.AlignLeft
-                    text: `${Math.min(root.combinedPercent, 999).toFixed(0)}%`
-                    font.pixelSize: root.pillFont
-                    color: Theme.surfaceText
-                    wrapMode: Text.NoWrap
-                    maximumLineCount: 1
-                    elide: Text.ElideRight
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-            }
+    verticalBarPill: Component {
+        IoPill {
+            pluginRoot: root
+            isVerticalOrientation: true
         }
     }
 
