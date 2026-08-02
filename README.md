@@ -14,6 +14,8 @@ Live disk read and write throughput in your [DankBar](https://github.com/AvengeM
 - Click the pill for the breakdown: read, write and the busiest disk pinned on top, then each disk, then per-process I/O with a kill icon on each row
 - Zero dependencies
 
+<img width="139" alt="The bar pill: label, a gauge with the disk icon inside it, and the percentage" src="screenshots/widget.png" />
+
 ## The popout
 
 System totals come from `/proc/vmstat`, so they work on every machine, including ones whose udev rules disable per-device I/O accounting. Per-disk rows appear when the kernel is keeping those counters. Rates need two samples, so everything is measured across one short window. Per-process figures come from `/proc/<pid>/io`, which counts real block-device traffic rather than page-cache hits; processes owned by other users are unreadable without privileges and are skipped.
@@ -42,6 +44,8 @@ Then enable it in Settings, Plugins, and add the widget to your bar layout in Se
 - **Bar height / width**: how thick the bar chart is drawn, as a share of the space it is given (default 35%)
 - **Throughput that counts as 100%**: megabytes per second that fill the chart, reads and writes together (default 200)
 - **Entries to show**: how many rows the popout lists, 5 to 60 (default 30)
+
+<img width="480" alt="The plugin's settings panel" src="screenshots/settings.png" />
 
 ## License
 
