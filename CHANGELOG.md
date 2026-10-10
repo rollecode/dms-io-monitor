@@ -1,5 +1,10 @@
 # Changelog
 
+### 1.1.1: 2026-10-10
+
+* Fix polling and theme colour from review [#687](https://github.com/AvengeMedia/dms-plugin-registry/issues/687)
+* Hide kill button on session processes
+
 ### 1.1.0: 2026-07-26
 
 * Read system totals from `/proc/vmstat`, which counts block I/O in the VM layer: the widget now reports real throughput on machines whose udev rules switch off per-device accounting, with no configuration

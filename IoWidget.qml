@@ -19,6 +19,8 @@ PluginComponent {
     property int topCount: pluginData.topCount || 30
     property var rows: []
     property bool popoutOpen: false
+    // Killing any of these ends or breaks the session, so their rows get no kill button.
+    readonly property var sessionCritical: ["driftwm", "Hyprland", "niri", "sway", "river", "labwc", "wayfire", "kwin_wayland", "kwin_x11", "gnome-shell", "plasmashell", "Xwayland", "xwayland-satell", "Xorg", "qs", "quickshell", "dms", "pipewire", "wireplumber", "dbus-daemon", "dbus-broker", "systemd"]
 
     readonly property real combinedPercent: 100 * (readRate + writeRate) / (fullScaleMb * 1048576)
 
@@ -28,7 +30,7 @@ PluginComponent {
 
     function usageColor(percent) {
         if (percent > 90) return Theme.error
-        if (percent > 75) return "#ffa500"
+        if (percent > 75) return Theme.warning
         return Theme.primary
     }
 
@@ -50,49 +52,42 @@ PluginComponent {
         return "0"
     }
 
+    // /proc/vmstat counts block I/O in the VM layer, so it reports real
+    // traffic even where per-device accounting is switched off.
+    FileView { id: vmstat; path: "/proc/vmstat"; blockLoading: true }
+
     Timer {
         interval: 1000
         running: true
         repeat: true
         triggeredOnStart: true
-        onTriggered: pillProcess.running = true
+        onTriggered: root.readVmstat()
     }
 
-    Process {
-        id: pillProcess
-        // /proc/vmstat counts block I/O in the VM layer, so it reports real
-        // traffic even where per-device accounting is switched off.
-        command: ["cat", "/proc/vmstat"]
-        running: false
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const gi = text.match(/^pgpgin (\d+)$/m)
-                const go = text.match(/^pgpgout (\d+)$/m)
-                if (!gi || !go) return
-                const rd = parseInt(gi[1]) * 1024
-                const wr = parseInt(go[1]) * 1024
-                if (root.prevIn > 0) {
-                    root.readRate = Math.max(0, rd - root.prevIn)
-                    root.writeRate = Math.max(0, wr - root.prevOut)
-                }
-                root.prevIn = rd
-                root.prevOut = wr
-            }
+    function readVmstat() {
+        vmstat.reload()
+        const text = vmstat.text()
+        const gi = text.match(/^pgpgin (\d+)$/m)
+        const go = text.match(/^pgpgout (\d+)$/m)
+        if (!gi || !go) return
+        const rd = parseInt(gi[1]) * 1024
+        const wr = parseInt(go[1]) * 1024
+        if (root.prevIn > 0) {
+            root.readRate = Math.max(0, rd - root.prevIn)
+            root.writeRate = Math.max(0, wr - root.prevOut)
         }
+        root.prevIn = rd
+        root.prevOut = wr
     }
 
-    // Warm the list in the background: the collectors take up to a second, and
-    // starting them on click leaves the popout empty until they finish.
+    // Process scans only while someone is looking; the last list stays shown until the first refresh.
     Timer {
-        interval: root.popoutOpen ? 2000 : 20000
-        running: true
+        interval: 2000
+        running: root.popoutOpen
         repeat: true
         triggeredOnStart: true
         onTriggered: rowsProcess.running = true
     }
-
-    onPopoutOpenChanged: if (popoutOpen) rowsProcess.running = true
 
     Process {
         id: rowsProcess
@@ -112,7 +107,7 @@ PluginComponent {
                         name: f[3],
                         detail: f[4] || "",
                         display: f[6] || "",
-                        killable: f[0] === "P",
+                        killable: f[0] === "P" && root.sessionCritical.indexOf(f[3]) === -1,
                         free: f[0] === "F",
                         pinned: f[0] === "F"
                     })
